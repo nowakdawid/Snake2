@@ -13,12 +13,14 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.input.GestureDetector;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
-public class GameScreen extends ScreenAdapter {
+public class GameScreen extends ScreenAdapter implements GestureDetector.GestureListener {
 
     //Game state data
     private enum STATE {
@@ -26,7 +28,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private STATE state = STATE.PLAYING;
-    private static final String GAME_OVER_TEXT = "GAME OVER MOTHERFUCKER! \n TAP SPACE TO TRY AGAIN";
+    private int score;
 
     //General data
     private static final float WORLD_WIDTH = 640;
@@ -34,6 +36,7 @@ public class GameScreen extends ScreenAdapter {
 
     private Viewport viewport;
     private Camera camera;
+    private GestureDetector gestureDetector;
 
     private BitmapFont bitmapFont;
     private GlyphLayout glyphLayout = new GlyphLayout();
@@ -42,7 +45,6 @@ public class GameScreen extends ScreenAdapter {
     private ShapeRenderer shapeRenderer;
     private static final int GRID_CELL = 32;
     private boolean directionSet = false;
-    private int score;
     private static final int POINTS_PER_APPLE = 10;
 
     //Directions
@@ -95,10 +97,11 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void show() {
-        camera = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        camera = new OrthographicCamera();
         camera.position.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 0);
-        camera.update();
         viewport = new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
+        gestureDetector = new GestureDetector(this);
+        Gdx.input.setInputProcessor(gestureDetector);
         batch = new SpriteBatch();
         snakeHead = new TextureRegion(snakeHeadTexture);
         apple = new TextureRegion(appleTexture);
@@ -108,7 +111,15 @@ public class GameScreen extends ScreenAdapter {
     }
 
     @Override
+    public void resize(int width, int height) {
+        viewport.update(width, height);
+        camera.position.set(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 0);
+    }
+
+    @Override
     public void render(float delta) {
+        camera.update();
+        shapeRenderer.setProjectionMatrix(camera.combined);
         super.render(delta);
         switch (state) {
             case PLAYING: {
@@ -126,12 +137,77 @@ public class GameScreen extends ScreenAdapter {
         clearScreen();
         draw();
         drawGrid();
-        batch.begin();
-        if (state == STATE.GAME_OVER) {
-            glyphLayout.setText(bitmapFont, GAME_OVER_TEXT);
-            bitmapFont.draw(batch, GAME_OVER_TEXT, (viewport.getWorldWidth() -
-                    glyphLayout.width) / 2, (viewport.getWorldHeight() - glyphLayout.height));
+        if (state == STATE.GAME_OVER) drawGameOverText(score);
+    }
+
+    @Override
+    public boolean touchDown(float x, float y, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean tap(float x, float y, int count, int button) {
+
+        if (state == state.GAME_OVER) doRestart();
+
+        switch (snakeDirection) {
+            case RIGHT:
+                updateDirection(DOWN);
+                break;
+            case LEFT:
+                updateDirection(UP);
+                break;
+            case UP:
+                updateDirection(RIGHT);
+                break;
+            case DOWN:
+                updateDirection(LEFT);
+                break;
         }
+        return false;
+    }
+
+    @Override
+    public boolean longPress(float x, float y) {
+        return false;
+    }
+
+    @Override
+    public boolean fling(float velocityX, float velocityY, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean pan(float x, float y, float deltaX, float deltaY) {
+        return false;
+    }
+
+    @Override
+    public boolean panStop(float x, float y, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean zoom(float initialDistance, float distance) {
+        return false;
+    }
+
+    @Override
+    public boolean pinch(Vector2 initialPointer1, Vector2 initialPointer2, Vector2 pointer1, Vector2 pointer2) {
+        return false;
+    }
+
+    @Override
+    public void pinchStop() {
+
+    }
+
+    private void drawGameOverText(int score) {
+        String string = "GAME OVER! \n YOUR FINAL SCORE: " + score + " \nTAP TO TRY AGAIN";
+        batch.begin();
+        glyphLayout.setText(bitmapFont, string);
+        bitmapFont.draw(batch, string, (viewport.getWorldWidth() -
+                glyphLayout.width) / 2, (viewport.getWorldHeight() - glyphLayout.height));
         batch.end();
     }
 
@@ -148,8 +224,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void draw() {
-        batch.setProjectionMatrix(camera.projection);
-        batch.setTransformMatrix(camera.view);
+        batch.setProjectionMatrix(camera.combined);
 
         batch.begin();
         batch.draw(grass, 0, 0);
@@ -259,13 +334,12 @@ public class GameScreen extends ScreenAdapter {
 
     private void drawGrid() {
 
-        batch.setProjectionMatrix(camera.projection);
-        batch.setTransformMatrix(camera.view);
+        batch.setProjectionMatrix(camera.combined);
 
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         for (int x = 0; x < viewport.getWorldWidth(); x += GRID_CELL) {
             for (int y = 0; y < viewport.getWorldHeight(); y += GRID_CELL) {
-                shapeRenderer.setColor(Color.FOREST);
+                shapeRenderer.setColor(Color.GREEN);
                 shapeRenderer.rect(x, y, GRID_CELL, GRID_CELL);
             }
         }
